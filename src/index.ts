@@ -9,6 +9,8 @@ app.use(express.json());
 
 registerController(app);
 
+
+
 const server = app.listen(8080, () => {
     console.log('App is running...');
 });
