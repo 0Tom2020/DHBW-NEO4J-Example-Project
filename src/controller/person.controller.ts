@@ -7,13 +7,14 @@ export const personControllerRouter = Router();
 //PUT create new Person
 personControllerRouter.post('/new', (req, res, next) => {
     const session = getSession();
-    if (req.body['name'] === undefined) {
+    if (req.body['name'] === undefined || req.body['username'] === undefined) {
         res.status(400).send('Bad Request');
         return;
     }
     const name = req.body['name'];
+    const username = req.body['username'];
 
-    session.run('match (n:Person) WHERE n.name = $name return count(n)', {name: name})
+    session.run('match (n:Person) WHERE n.username = $username return count(n)', {username: username})
         .then((result) => {
             const count = result.records[0].get('count(n)').toNumber();
             if (count > 0) {
@@ -23,7 +24,7 @@ personControllerRouter.post('/new', (req, res, next) => {
                 res.end();
             } else {
                 // Person does not exist
-                session.run('CREATE (:Person {name: $name})', {name: name})
+                session.run('CREATE (:Person {name: $name, username: $username})', {name: name, username: username})
                     .then(() => {
                         session.close();
                         res.status(200);
@@ -69,7 +70,7 @@ personControllerRouter.post('/connection', async (req, res, next) => {
     }
 
 
-     session.run('MATCH (p1:Person)-[r:follows]->(p2:Person) WHERE p1.name = $personOne AND p2.name = $followsPersonTwo RETURN count(r) AS count', {
+     session.run('MATCH (p1:Person)-[r:follows]->(p2:Person) WHERE p1.username = $personOne AND p2.username = $followsPersonTwo RETURN count(r) AS count', {
          personOne: personOne,
          followsPersonTwo: followsPersonTwo
      })
@@ -83,7 +84,7 @@ personControllerRouter.post('/connection', async (req, res, next) => {
                  res.end();
              } else {
                  // Relationship does not exist
-                 session.run('MATCH (p1:Person {name: $personOne}), (p2:Person {name: $followsPersonTwo}) CREATE (p1)-[:follows]->(p2)', {
+                 session.run('MATCH (p1:Person {username: $personOne}), (p2:Person {username: $followsPersonTwo}) CREATE (p1)-[:follows]->(p2)', {
                      personOne: personOne,
                      followsPersonTwo: followsPersonTwo
                  })
@@ -138,7 +139,7 @@ personControllerRouter.delete('/connection', async (req, res, next) => {
     }
 
 
-    session.run('MATCH (p1:Person)-[r:follows]->(p2:Person) WHERE p1.name = $personOne AND p2.name = $followsPersonTwo RETURN count(r) AS count', {
+    session.run('MATCH (p1:Person)-[r:follows]->(p2:Person) WHERE p1.username = $personOne AND p2.username = $followsPersonTwo RETURN count(r) AS count', {
         personOne: personOne,
         followsPersonTwo: unfollowsPersonTwo
     })
@@ -146,7 +147,7 @@ personControllerRouter.delete('/connection', async (req, res, next) => {
             const count = result.records[0].get('count').toNumber();
             if (count > 0) {
                 // Relationship exists
-                session.run('MATCH (p1:Person {name: $personOne})-[r:follows]->(p2:Person {name: $followsPersonTwo}) DELETE r', {
+                session.run('MATCH (p1:Person {username: $personOne})-[r:follows]->(p2:Person {username: $followsPersonTwo}) DELETE r', {
                     personOne: personOne,
                     followsPersonTwo: unfollowsPersonTwo
                 })
@@ -178,12 +179,14 @@ personControllerRouter.delete('/connection', async (req, res, next) => {
 //DELETE delete Person
 personControllerRouter.delete('/delete', async (req, res, next) => {
     const session = getSession();
-    if (req.body['name'] === undefined) {
+    if (req.body['username'] === undefined) {
         res.status(400).send('Bad Request');
         return;
     }
 
-    const personExists = await checkIfPersonExists(req.body['name']);
+    const username = req.body['username'];
+
+    const personExists = await checkIfPersonExists(username);
     if (!personExists) {
         session.close();
         res.status(400);
@@ -192,13 +195,13 @@ personControllerRouter.delete('/delete', async (req, res, next) => {
         return;
     }
 
-    const name = req.body['name'];
-    session.run('match (n:Person) WHERE n.name = $name return count(n)', {name: name})
+
+    session.run('match (n:Person) WHERE n.username = $name return count(n)', {name: username})
         .then((result) => {
             const count = result.records[0].get('count(n)').toNumber();
             if (count > 0) {
                 // Person exists
-                session.run('MATCH (p:Person {name: $name}) DETACH DELETE p', {name: name})
+                session.run('MATCH (p:Person {username: $name}) DETACH DELETE p', {name: username})
                     .then(() => {
                         session.close();
                         res.status(200);

@@ -7,9 +7,14 @@ export const queryController = Router();
 //GET get all persons
 queryController.get('/persons', (req, res, next) => {
     const session = getSession();
-    session.run('MATCH (n:Person) RETURN n.name')
+    session.run('MATCH (n:Person) RETURN n.username, n.name')
         .then((result) => {
-            const persons = result.records.map(record => record.get('n.name'));
+            const persons = result.records.map(record => {
+                return {
+                    username: record.get('n.username'),
+                    name: record.get('n.name'),
+                }
+            });
             res.status(200);
             res.send(persons);
             res.end();
@@ -22,12 +27,17 @@ queryController.get('/persons', (req, res, next) => {
 });
 
 //GET all persons that personOne follows
-queryController.get('/persons/:personOne/follows', (req, res, next) => {
+queryController.get('/persons/:username/follows', (req, res, next) => {
     const session = getSession();
-    const personOne = req.params['personOne'];
-    session.run('MATCH (n:Person {name: $name})-[:follows]->(m:Person) RETURN m.name', {name: personOne})
+    const username = req.params['username'];
+    session.run('MATCH (n:Person {username: $name})-[:follows]->(m:Person) RETURN m.name, m.username', {name: username})
         .then((result) => {
-            const persons = result.records.map(record => record.get('m.name'));
+            const persons = result.records.map(record => {
+                return {
+                    username: record.get('m.username'),
+                    name: record.get('m.name'),
+                }
+            });
             res.status(200);
             res.send(persons);
             res.end();
@@ -40,13 +50,13 @@ queryController.get('/persons/:personOne/follows', (req, res, next) => {
 });
 
 //GET get shortest path between two persons
-queryController.get('/persons/:personOne/shortestPath/:personTwo', async (req, res, next) => {
+queryController.get('/persons/:usernameOne/shortestPath/:usernameTwo', async (req, res, next) => {
     const session = getSession();
-    const personOne = req.params['personOne'];
-    const personTwo = req.params['personTwo'];
+    const usernameOne = req.params['usernameOne'];
+    const usernameTwo = req.params['usernameTwo'];
 
-    const personOneExists = await checkIfPersonExists(personOne);
-    const personTwoExists = await checkIfPersonExists(personTwo);
+    const personOneExists = await checkIfPersonExists(usernameOne);
+    const personTwoExists = await checkIfPersonExists(usernameTwo);
 
     if (!personOneExists) {
         session.close();
@@ -64,28 +74,28 @@ queryController.get('/persons/:personOne/shortestPath/:personTwo', async (req, r
     }
 
 
-    session.run('MATCH (p1:Person {name: $personOne}), (p2:Person {name: $personTwo}) MATCH path = shortestPath((p1)-[:follows*]->(p2)) RETURN path', {
-        personOne: personOne,
-        personTwo: personTwo
+    session.run('MATCH (p1:Person {username: $usernameOne}), (p2:Person {username: $usernameTwo}) MATCH path = shortestPath((p1)-[:follows*]->(p2)) RETURN path', {
+        usernameOne: usernameOne,
+        usernameTwo: usernameTwo
     })
         .then((result) => {
             const paths = result.records.map(record => record.get('path'));
 
             if (paths.length === 0) {
                 res.status(400);
-                res.send('No path found between ' + personOne + ' and ' + personTwo);
+                res.send('No path found between ' + usernameOne + ' and ' + usernameTwo);
                 res.end();
                 return;
             }
 
             res.status(200);
             const pathStrings = paths.map(path => {
-                const names = path.segments.map(segment => segment.start.properties.name)
-                    .concat(path.end.properties.name);
+                const names = path.segments.map(segment => segment.start.properties.username)
+                    .concat(path.end.properties.username);
                 return names.join(' --> ');
             });
 
-            res.send(pathStrings.join('\n'));
+            res.send(pathStrings);
             res.end();
         })
         .catch(error => {
@@ -94,6 +104,48 @@ queryController.get('/persons/:personOne/shortestPath/:personTwo', async (req, r
             next(error);
         });
 });
+
+// GET all persons who personOne is follower and who personTwo followed
+queryController.get('/persons/:usernameOne/:usernameTwo/followed', async (req, res, next) => {
+    const session = getSession();
+    const usernameOne = req.params['usernameOne'];
+    const usernameTwo = req.params['usernameTwo'];
+
+    const personOneExists = await checkIfPersonExists(usernameOne);
+    const personTwoExists = await checkIfPersonExists(usernameTwo);
+
+    if (!personOneExists) {
+        session.close();
+        res.status(400);
+        res.send('PersonOne does not exist');
+        res.end();
+        return;
+    }
+    if (!personTwoExists) {
+        session.close();
+        res.status(400);
+        res.send('PersonTwo does not exist');
+        res.end();
+        return;
+    }
+
+    session.run('MATCH (p:Person {username: $usernameTwo})-[:follows]->(followed:Person) MATCH (followed)<-[:follows]-(you:Person {username: $usernameOne}) RETURN followed.name, followed.username', {
+        usernameOne: usernameOne,
+        usernameTwo: usernameTwo
+    }).then((result) => {
+        const follower = result.records.map(record => record.get('followed.username'));
+        res.status(200);
+        res.send(follower);
+        res.end();
+    })
+        .catch(error => {
+            console.log(error);
+            session.close();
+            next(error);
+        });
+})
+
+
 /*
 //GET get all persons that the person follows (and the person --> depth x times)
 queryController.get('/persons/:person/follows/:depth', (req, res, next) => {
@@ -129,11 +181,11 @@ queryController.get('/persons/:person/follows/:depth', (req, res, next) => {
 
 
 //GET all persons that follow a person
-queryController.get('/persons/:person/followers', (req, res, next) => {
+queryController.get('/persons/:username/followers', (req, res, next) => {
     const session = getSession();
-    const person = req.params['person'];
+    const username = req.params['username'];
 
-    if (!checkIfPersonExists(person)) {
+    if (!checkIfPersonExists(username)) {
         session.close();
         res.status(400);
         res.send('Person does not exist');
@@ -141,7 +193,7 @@ queryController.get('/persons/:person/followers', (req, res, next) => {
         return;
     }
 
-    session.run('MATCH (n:Person {name: $name})<-[:follows]-(m:Person) RETURN m.name', {name: person})
+    session.run('MATCH (n:Person {username: $username})<-[:follows]-(m:Person) RETURN m.name', {username: username})
         .then((result) => {
             const persons = result.records.map(record => record.get('m.name'));
             res.status(200);
@@ -154,27 +206,3 @@ queryController.get('/persons/:person/followers', (req, res, next) => {
             next(error);
         });
 })
-
-
-
-
-
-
-
-
-/*// Create 20 people with random names
-FOREACH (name IN ['Alice', 'Bob', 'Charlie', 'David', 'Eve', 'Frank', 'Grace', 'Henry', 'Isabelle', 'Jack', 'Kate', 'Liam', 'Mia', 'Nathan', 'Olivia', 'Peter', 'Queenie', 'Rachel', 'Samuel', 'Tina'] |
-CREATE (:Person {name: name}));
-
-// Create random follow relationships
-MATCH (p1:Person), (p2:Person)
-WHERE p1 <> p2 AND rand() < 0.5
-WITH p1, p2 LIMIT 50
-CREATE (p1)-[:follows]->(p2);
-
-// Create random follow-back relationships
-MATCH (p1:Person)-[r:follows]->(p2:Person)
-WHERE rand() < 0.5
-WITH p1, p2, r
-MERGE (p2)-[:follows]->(p1);*/
-

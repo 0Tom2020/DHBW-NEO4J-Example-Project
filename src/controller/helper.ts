@@ -2,7 +2,7 @@ import {getSession} from "../database";
 
 export function checkIfPersonExists(person) {
     const session = getSession();
-    return session.run('MATCH (p:Person {name: $person}) RETURN p', {person: person})
+    return session.run('MATCH (p:Person {username: $person}) RETURN p', {person: person})
         .then((result) => {
             session.close();
             return result.records.length > 0;
