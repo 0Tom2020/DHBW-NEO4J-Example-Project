@@ -8,7 +8,7 @@ export const personControllerRouter = Router();
 personControllerRouter.post('/new', (req, res, next) => {
     const session = getSession();
     if (req.body['name'] === undefined || req.body['username'] === undefined) {
-        res.status(400).send('Bad Request');
+        res.status(400).send('Attribute name or username is missing');
         return;
     }
     const name = req.body['name'];
@@ -180,7 +180,7 @@ personControllerRouter.delete('/connection', async (req, res, next) => {
 personControllerRouter.delete('/delete', async (req, res, next) => {
     const session = getSession();
     if (req.body['username'] === undefined) {
-        res.status(400).send('Bad Request');
+        res.status(400).send('Attribute username is missing');
         return;
     }
 
