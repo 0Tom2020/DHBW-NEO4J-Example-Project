@@ -145,41 +145,6 @@ queryController.get('/persons/:usernameOne/:usernameTwo/followed', async (req, r
         });
 })
 
-
-/*
-//GET get all persons that the person follows (and the person --> depth x times)
-queryController.get('/persons/:person/follows/:depth', (req, res, next) => {
-    const session = getSession()
-    const person = req.params['person'];
-    const depth = req.params['depth'];
-    const depthNumber = Number(depth)
-
-    if (!checkIfPersonExists(person)) {
-        session.close();
-        res.status(400);
-        res.send('Person does not exist');
-        res.end();
-        return;
-    }
-
-    session.run('MATCH (p:Person {name: $person}) MATCH path = (p)-[:follows]->()-[:follows]->(f:Person) WHERE length(path) = $depth AND NOT (p)-[:follows]->(f) RETURN DISTINCT f.name', {
-        person: person,
-        depth: depth
-    })
-        .then((result) => {
-            const persons = result.records.map(record => record.get('f.name'));
-            res.status(200);
-            res.send(persons);
-            res.end();
-        })
-        .catch(error => {
-            console.log(error);
-            session.close();
-            next(error);
-        });
-});*/
-
-
 //GET all persons that follow a person
 queryController.get('/persons/:username/followers', (req, res, next) => {
     const session = getSession();
